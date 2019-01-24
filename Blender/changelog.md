@@ -1,21 +1,22 @@
 # Blender2Babylon add-on changelog
 
 ## Blender Exporter Version 6.0.0
-*01 February 2019*
+*24 January 2019*
 
 * Supports Blender 2.80 redesign
 * Removed Internal render materials support
 * Relocated Game Engine render properties used
 * Moved all exporter level custom properties from scene tab to world tab
 * Changes to world tab:
-	* Properties from scene tab
+	* Added properties from scene tab
 	* Added Sky Box / Environment Textures section
 	* Added `Use PBR` checkbox
 * Changes to mesh tab / proccesing:
 	* Relocated Billboard Mode from Game Engine to here
 	* Relocated most of material section to new panel in Materials tab
 	* Remaining materials stuff now in 'Baking Settings' section.  Added `Force Baking` checkbox to avoid multi-materials.
-    * Blender's mixed flat / smooth shading now supported
+    * Blender's mixed flat / smooth shading now supported, or custom split normals if used.
+    * Custom properties `Picking` & `Disabled` are now using Outliner Icons instead.
     * Alpha now supported in vertex colors
 * Changes for lights tab / proccessing:
     * Added `PBR intensity mode` custom property.  When `Automatic` or not PBR, `intensity` scaled 0-1 from Blender's `Energy`, where 10 is 1.  Otherwise `Energy` passed, unmodified.
@@ -24,7 +25,7 @@
 * Added new custom properties panel for Materials:
 	* Relocated `Back Face Culling` checkbox from Game Engine to here
 	* Relocated `Check Ready Only` Once checkbox from Mesh tab to here
-	* Relocated `Max Simultaneous` Lights from Mesh tab to here
+	* Relocated `Max Simultaneous Lights` from Mesh tab to here
 	* Relocated Name Space from Mesh tab to here (might be in TOB only, since JSON files cannot share materials)
 * Mesh baking can be reduced to only the texture channels required, keeping other image texture based channels (not for multi-material meshes)
 * Nodes based renders (Cycles & eevee) not always just baked.  See chart for properties / textures & where values are from.  Properties are only assigned when no texture input to socket.

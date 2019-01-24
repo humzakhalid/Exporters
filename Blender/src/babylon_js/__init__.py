@@ -1,7 +1,7 @@
 bl_info = {
     'name': 'Babylon.js',
     'author': 'David Catuhe, Jeff Palmer',
-    'version': (6, 0, -6),
+    'version': (6, 0, -7),
     'blender': (2, 80, 0),
     'location': 'File > Export > Babylon.js (.babylon)',
     'description': 'Export Babylon.js scenes (.babylon)',
@@ -66,7 +66,7 @@ class JsonMain(bpy.types.Operator, ExportHelper):
 
         if (exporter.fatalError):
             self.report({'ERROR'}, exporter.fatalError)
-            
+
         elif (exporter.nErrors > 0):
             self.report({'ERROR'}, 'Output cancelled due to data error, See log file.')
 
@@ -89,10 +89,10 @@ from . import world # must be defined before mesh
 from . import mesh
 classes = (
     # Operator sub-classes
-    JsonMain, 
-    
+    JsonMain,
+
     # Panel sub-classes
-    camera.CameraPanel,    
+    camera.CameraPanel,
     light_shadow.LightPanel,
     materials.material.MaterialsPanel,
     mesh.MeshPanel,
@@ -109,7 +109,7 @@ def unregister():
     from bpy.utils import unregister_class
     for cls in reversed(classes):
         unregister_class(cls)
-        
+
     bpy.types.TOPBAR_MT_file_export.remove(menu_func)
 
 # Registration the calling of the INFO_MT_file_export file selector

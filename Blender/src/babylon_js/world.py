@@ -24,20 +24,20 @@ class World:
     def __init__(self, scene):
         self.autoClear = True
         world = scene.world
-        #self.ambient_color = world.ambient_color # nuke for 2.80
-        self.clear_color   = world.color # color for 2.80
+        self.clear_color = world.color
 
         self.gravity = scene.gravity
         self.writeManifestFile = world.writeManifestFile
 
         self.fogMode = int(world.fogMode)
         if self.fogMode > 0:
-            self.fogColor = world.horizon_color # color for 2.80
+            self.fogColor = world.color
             self.fogStart = world.mist_settings.start
             self.fogEnd = world.mist_settings.depth
             self.fogDensity = world.fogDensity
 
         # HDRI
+        self.skyBox = world.skyBox # ensure always assigned
         self.bjsTexture = None # ensure always assigned
         if world.use_nodes:
             worldNode = AbstractBJSNode.readWorldNodeTree(world.node_tree)
@@ -45,7 +45,6 @@ class World:
                 self.bjsTexture = worldNode.bjsTextures[ENVIRON_TEX]
                 self.environmentTextureSize = world.environmentTextureSize
                 self.isPBR = world.usePBRMaterials
-                self.skyBox = world.skyBox
                 self.boxBlur = world.boxBlur
 
         Logger.log('Python World class constructor completed')
@@ -70,24 +69,12 @@ class World:
             write_string(file_handler, 'environmentTexture', self.bjsTexture.fileNoPath)
             write_string(file_handler, 'environmentTextureType', 'BABYLON.HDRCubeTexture')
             write_int(file_handler, 'environmentTextureSize', self.environmentTextureSize)
-            write_bool(file_handler, 'isPBR', self.isPBR) 
+            write_bool(file_handler, 'isPBR', self.isPBR)
             # also attempt to create a sky box when environment texture exported
             if self.skyBox:
-                write_bool(file_handler, 'createDefaultSkybox', True) 
+                write_bool(file_handler, 'createDefaultSkybox', True)
                 write_float(file_handler, 'skyboxBlurLevel ', self.boxBlur)
 #===============================================================================
-# probably delete!!!!!!!!!!!!!!!!
-bpy.types.World.exportScope = bpy.props.EnumProperty(
-    name="Export Scope",
-    description="Export selection control",
-    items=(
-        (SCOPE_ALL, "Entire scene", "Export the whole scene"),
-        (SCOPE_SELECTED, "Selected Objects", "Export the selected objects only"),
-        (SCOPE_VISIBLE, "Selected Layers", "Export only objects in the active layers"),
-    ),
-    default=SCOPE_ALL
-)
-
 ###      Skybox environment      ###
 bpy.types.World.environmentTextureSize = bpy.props.EnumProperty(
     name='Texture Size',
@@ -226,8 +213,6 @@ class WorldPanel(bpy.types.Panel):
         layout = self.layout
 
         world = context.world
-        # probably permanently delete, but wait for now
-        #layout.prop(world, 'exportScope')
 
         box = layout.box()
         box.label(text='Sky Box / Environment Texture:')

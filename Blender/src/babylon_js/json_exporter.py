@@ -26,6 +26,19 @@ class JsonExporter:
         self.scene = scene # reference for passing
         self.settings = scene.world
         self.fatalError = None
+
+        self.cameras = []
+        self.lights = []
+        self.shadowGenerators = []
+        self.skeletons = []
+        skeletonId = 0
+        self.meshesAndNodes = []
+        self.morphTargetMngrs = []
+        self.materials = []
+        self.multiMaterials = []
+        self.sounds = []
+        self.needPhysics = False
+
         try:
             self.filepathMinusExtension = filepath.rpartition('.')[0]
             JsonExporter.nameSpace = getNameSpace(self.filepathMinusExtension)
@@ -47,7 +60,6 @@ class JsonExporter:
 
             Logger.log('========= Conversion from Blender to Babylon.js =========', 0)
             Logger.log('Scene settings used :', 1)
-            Logger.log('export scope        :  ' + self.settings.exportScope, 2)
             Logger.log('inline textures     :  ' + format_bool(self.inlineTextures), 2)
             Logger.log('Material Type       :  ' + ('PBR' if self.settings.usePBRMaterials else 'STD'), 2)
             Logger.log('Positions Precision :  ' + format_int(self.settings.positionsPrecision), 2)
@@ -68,37 +80,16 @@ class JsonExporter:
             else:
                 Logger.warn('No active camera has been assigned, or is not in a currently selected Blender layer')
 
-            self.cameras = []
-            self.lights = []
-            self.shadowGenerators = []
-            self.skeletons = []
-            skeletonId = 0
-            self.meshesAndNodes = []
-            self.morphTargetMngrs = []
-            self.materials = []
-            self.multiMaterials = []
-            self.sounds = []
-            self.needPhysics = False
-
-            scanObjects = []
-            if (self.settings.exportScope == 'ALL'):
-                scanObjects = scene.objects
-            elif (self.settings.exportScope == 'SELECTED'):
-                scanObjects = bpy.context.selected_objects
-            elif (self.settings.exportScope == 'VISIBLE'):
-                scanObjects = list(filter(
-                    lambda o: self.isInSelectedLayer(o, scene),
-                    scene.objects
-                ))
-
             # Scene level sound
             if self.settings.attachedSound != '':
                 self.sounds.append(Sound(self.settings.attachedSound, self.settings.autoPlaySound, self.settings.loopSound))
 
             # separate loop doing all skeletons, so available in Mesh to make skipping IK bones possible
-            for object in [object for object in scanObjects]:
+            for object in scene.objects:
+                if self.shouldBeCulled(object): continue
+
                 scene.frame_set(currentFrame)
-                if object.type == 'ARMATURE':  #skeleton.pose.bones
+                if object.type == 'ARMATURE':
                     if object.visible_get():
                         self.skeletons.append(Skeleton(object, context, skeletonId, self.settings.ignoreIKBones))
                         skeletonId += 1
@@ -106,11 +97,13 @@ class JsonExporter:
                         Logger.warn('The following armature not visible in scene thus ignored: ' + object.name)
 
             # exclude light in this pass, so ShadowGenerator constructor can be passed meshesAnNodes
-            for object in [object for object in scanObjects]:
+            for object in scene.objects:
+                if self.shouldBeCulled(object): continue
+
                 scene.frame_set(currentFrame)
                 if object.type == 'CAMERA':
-                    if object.visible_get(): # no isInSelectedLayer() required, visible_get() handles this for them
-                        self.cameras.append(Camera(object))
+                    if object.visible_get():
+                        self.cameras.append(Camera(object, self))
                     else:
                         Logger.warn('The following camera not visible in scene thus ignored: ' + object.name)
 
@@ -120,7 +113,7 @@ class JsonExporter:
                         self.fatalError = 'Mesh: ' + mesh.name + ' has un-applied transformations.  This will never work for a mesh with an armature.  Export cancelled'
                         Logger.log(self.fatalError)
                         return
-                    
+
                     if hasattr(mesh, 'positions') and len(mesh.positions) == 0:  # instances will have no positions assigned
                         Logger.warn('mesh, ' + mesh.name + ', has 0 vertices; ignored')
                         continue
@@ -142,9 +135,11 @@ class JsonExporter:
                     Logger.warn('The following object (type - ' +  object.type + ') is not currently exportable thus ignored: ' + object.name)
 
             # Lamp / shadow Generator pass; meshesAnNodes complete & forceParents included
-            for object in [object for object in scanObjects]:
+            for object in scene.objects:
+                if self.shouldBeCulled(object): continue
+
                 if object.type == 'LIGHT':
-                    bulb = Light(object, self.settings.usePBRMaterials)
+                    bulb = Light(object, self, self.settings.usePBRMaterials)
                     self.lights.append(bulb)
                     if object.data.shadowMap != 'NONE':
                         if bulb.light_type == DIRECTIONAL_LIGHT or bulb.light_type == SPOT_LIGHT:
@@ -315,15 +310,6 @@ class JsonExporter:
 
         return None
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    def isInSelectedLayer(self, obj, scene):
-        if not scene.export_onlySelectedLayer:
-            return True
-
-        for l in range(0, len(scene.layers)):
-            if obj.layers[l] and scene.layers[l]:
-                return True
-        return False
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     def get_skeleton(self, name):
         for skeleton in self.skeletons:
             if skeleton.name == name:
@@ -337,3 +323,19 @@ class JsonExporter:
                 return idx
         #really cannot happen, will cause exception in caller
         return None
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    def shouldBeCulled(self, object):
+        return object.hide_viewport or object.users_collection[0].hide_viewport
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    # only return a parent, when is has not been culled
+    def getExportedParent(self, childObject):
+        cand = childObject.parent
+        if cand is None or self.shouldBeCulled(cand):
+            return None
+
+        # lights & cameras must also be visible to be exported, so check if parent a light or camera
+        if cand.type == 'CAMERA' or cand.type == 'LIGHT':
+            if not cand.visible_get():
+                return None
+
+        return cand

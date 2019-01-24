@@ -26,57 +26,51 @@ ILLUMINANCE_MODE = '3';
 LUMINANCE_MODE = '4';
 #===============================================================================
 class Light(FCurveAnimatable):
-    def __init__(self, light, usePBRMaterials):
-        if light.parent and light.parent.type != 'ARMATURE':
-            self.parentId = light.parent.name
+    def __init__(self, bpyLight, exporter, usePBRMaterials):
 
-        self.name = light.name
-        self.define_animations(light, False, True, False)
+        exportedParent = exporter.getExportedParent(bpyLight)
+        if exportedParent and exportedParent.type != 'ARMATURE':
+            self.parentId = exportedParent.name
+
+        self.name = bpyLight.name
+        self.define_animations(bpyLight, False, True, False)
 
         light_type_items = {'POINT': POINT_LIGHT, 'SUN': DIRECTIONAL_LIGHT, 'SPOT': SPOT_LIGHT, 'AREA': HEMI_LIGHT}
-        self.light_type = light_type_items[light.data.type]
+        self.light_type = light_type_items[bpyLight.data.type]
         Logger.log('processing begun of light (' + ('POINT', 'DIRECTIONAL', 'SPOT', 'HEMI FROM AREA')[self.light_type] + '):  ' + self.name)
 
         if self.light_type == POINT_LIGHT:
-            self.position = light.location
-            self.range = light.data.cutoff_distance
-            self.radius = light.data.shadow_soft_size
+            self.position = bpyLight.location
+            self.range = bpyLight.data.cutoff_distance
+            self.radius = bpyLight.data.shadow_soft_size
 
         elif self.light_type == DIRECTIONAL_LIGHT:
-            self.position = light.location
-            self.direction = Light.get_direction(light.matrix_local)
-            self.radius = light.data.shadow_soft_size
+            self.position = bpyLight.location
+            self.direction = Light.get_direction(bpyLight.matrix_local)
+            self.radius = bpyLight.data.shadow_soft_size
 
         elif self.light_type == SPOT_LIGHT:
-            self.position = light.location
-            self.direction = Light.get_direction(light.matrix_local)
-            self.angle = light.data.spot_size
-            self.exponent = light.data.spot_blend * 2
-            self.range = light.data.cutoff_distance
-            self.radius = light.data.shadow_soft_size
+            self.position = bpyLight.location
+            self.direction = Light.get_direction(bpyLight.matrix_local)
+            self.angle = bpyLight.data.spot_size
+            self.exponent = bpyLight.data.spot_blend * 2
+            self.range = bpyLight.data.cutoff_distance
+            self.radius = bpyLight.data.shadow_soft_size
 
         else:
             # Hemi discontinued for Blender 2.80, so using area
-            self.range = light.data.cutoff_distance
-            matrix_local = light.matrix_local.copy()
+            self.range = bpyLight.data.cutoff_distance
+            matrix_local = bpyLight.matrix_local.copy()
             matrix_local.translation = Vector((0, 0, 0))
             self.direction = (Vector((0, 0, -1)) @ matrix_local)
             self.direction = scale_vector(self.direction, -1)
             self.groundColor = Color((0, 0, 0))
-            self.radius = light.data.size
+            self.radius = bpyLight.data.size
 
-        self.intensityMode = light.data.pbrIntensityMode if usePBRMaterials else AUTOMATIC_MODE
-        self.intensity = min(light.data.energy / 10.0, 1.0) if self.intensityMode == AUTOMATIC_MODE else light.data.energy
-        self.diffuse   = light.data.color
-        self.specular  = light.data.color * light.data.specular_factor
-
-        # inclusion section; discontinued for Blender 2.80; meshesAndNodes was a former argument
-        #if light.data.use_own_layer:
-        #    lampLayer = getLayer(light)
-        #    self.includedOnlyMeshesIds = []
-        #    for mesh in meshesAndNodes:
-        #        if mesh.layer == lampLayer:
-        #            self.includedOnlyMeshesIds.append(mesh.name)
+        self.intensityMode = bpyLight.data.pbrIntensityMode if usePBRMaterials else AUTOMATIC_MODE
+        self.intensity = min(bpyLight.data.energy / 10.0, 1.0) if self.intensityMode == AUTOMATIC_MODE else bpyLight.data.energy
+        self.diffuse   = bpyLight.data.color
+        self.specular  = bpyLight.data.color * bpyLight.data.specular_factor
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     @staticmethod
     def get_direction(matrix):

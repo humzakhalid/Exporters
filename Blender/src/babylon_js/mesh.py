@@ -42,9 +42,9 @@ class Mesh(FCurveAnimatable):
         Logger.log('processing begun of mesh:  ' + self.name)
         self.define_animations(bpyMesh, True, True, True)  #Should animations be done when forcedParent
 
-        self.isVisible = not bpyMesh.hide_render
-        self.isPickable = bpyMesh.data.isPickable
-        self.isEnabled = not bpyMesh.data.loadDisabled
+        self.isVisible = bpyMesh.visible_get()
+        self.isPickable = not bpyMesh.hide_select
+        self.isEnabled = not bpyMesh.hide_render
         self.checkCollisions = bpyMesh.data.checkCollisions
         self.receiveShadows = bpyMesh.data.receiveShadows
         self.castShadows = bpyMesh.data.castShadows
@@ -74,13 +74,15 @@ class Mesh(FCurveAnimatable):
                 else:
                     self.skeletonId = exporter.get_skeletonIndex(objArmature.name)
 
+        exportedParent = exporter.getExportedParent(bpyMesh)
+
         # determine Position, rotation, & scaling
         # Use local matrix
         locMatrix = bpyMesh.matrix_local
         if objArmature != None:
             # unless the armature is the parent
-            if bpyMesh.parent and bpyMesh.parent == objArmature:
-                locMatrix = bpyMesh.matrix_world @ bpyMesh.parent.matrix_world.inverted()
+            if exportedParent and exportedParent == objArmature:
+                locMatrix = bpyMesh.matrix_world @ exportedParent.matrix_world.inverted()
 
         loc, rot, scale = locMatrix.decompose()
         self.position = loc
@@ -98,8 +100,8 @@ class Mesh(FCurveAnimatable):
 
         # determine parent & dataName
         self.dataName = bpyMesh.data.name # used to support shared vertex instances in later passed
-        if bpyMesh.parent and bpyMesh.parent.type != 'ARMATURE':
-            self.parentId = bpyMesh.parent.name
+        if exportedParent and exportedParent.type != 'ARMATURE':
+            self.parentId = exportedParent.name
 
         # Physics
         if bpyMesh.rigid_body != None:
@@ -658,7 +660,7 @@ class Mesh(FCurveAnimatable):
 
             first = False
         file_handler.write(']')
-        
+
         # Shape Keys
         if hasattr(self, 'morphTargetManagerId'):
             write_int(file_handler, 'morphTargetManagerId', self.morphTargetManagerId)
@@ -693,7 +695,7 @@ class MeshInstance:
         self.scaling = instancedMesh.scaling
         self.freezeWorldMatrix = instancedMesh.freezeWorldMatrix
         self.tags = instancedMesh.tags
-        
+
         if hasattr(instancedMesh, 'physicsImpostor'):
             self.physicsImpostor = instancedMesh.physicsImpostor
             self.physicsMass = instancedMesh.physicsMass
@@ -793,11 +795,6 @@ bpy.types.Mesh.autoAnimate = bpy.props.BoolProperty(
     description='',
     default = False
 )
-bpy.types.Mesh.isPickable = bpy.props.BoolProperty(
-    name='Pickable',
-    description='Disable picking for a mesh.',
-    default = True
-)
 bpy.types.Mesh.checkCollisions = bpy.props.BoolProperty(
     name='Check Collisions',
     description='Indicates mesh should be checked that it does not run into anything.',
@@ -842,11 +839,6 @@ bpy.types.Mesh.bakeQuality = bpy.props.IntProperty(
 bpy.types.Mesh.freezeWorldMatrix = bpy.props.BoolProperty(
     name='Freeze World Matrix',
     description='Indicate the position, rotation, & scale do not change for performance reasons',
-    default = False
-)
-bpy.types.Mesh.loadDisabled = bpy.props.BoolProperty(
-    name='Load Disabled',
-    description='Indicate this mesh & children should not be active until enabled by code.',
     default = False
 )
 bpy.types.Mesh.attachedSound = bpy.props.StringProperty(
@@ -906,23 +898,21 @@ class MeshPanel(bpy.types.Panel):
 
     def draw(self, context):
         ob = context.object
-        layout = self.layout  
-            
+        layout = self.layout
+
         # - - - - - - - - - - - - - - - - - - - - - - - - -
         row = layout.row()
-        row.prop(ob.data, 'isPickable')
-        row.prop(ob.data, 'checkCollisions')
-        
+
         row = layout.row()
         row.prop(ob.data, 'castShadows')
         row.prop(ob.data, 'receiveShadows')
-        
+
         row = layout.row()
         row.prop(ob.data, 'freezeWorldMatrix')
-        row.prop(ob.data, 'loadDisabled')
-        
+        row.prop(ob.data, 'checkCollisions')
+
         layout.prop(ob.data, 'autoAnimate')
-        
+
         layout.prop(ob.data, 'tags')
         layout.prop(ob.data, 'billboardMode')
         # - - - - - - - - - - - - - - - - - - - - - - - - -
